@@ -1,0 +1,67 @@
+!DOCTYPE html
+html lang=he dir=rtl
+head
+    meta charset=UTF-8
+    meta name=viewport content=width=device-width, initial-scale=1.0
+    titleמשימות משפחת אורןtitle
+    script src=httpscdn.tailwindcss.comscript
+    style
+        body { font-family system-ui, -apple-system, sans-serif; background #f0f2f5; }
+        .card { background white; border-radius 12px; box-shadow 0 2px 4px rgba(0,0,0,0.1); }
+    style
+head
+body class=p-4
+    div class=max-w-md mx-auto
+        header class=mb-6 text-center
+            h1 class=text-2xl font-bold text-blue-600Oren Family Tasks 🏠h1
+            p class=text-gray-500ניהול משימות ונדנודים בזמן אמתp
+        header
+
+        div id=taskList class=space-y-4
+            div
+    div
+
+    script
+        const tasks = [
+            { id 1, title להוציא את לוסי לטיול 🐶, assignee יולי },
+            { id 2, title לרוקן מדיח 🍽️, assignee רומי },
+            { id 3, title לקנות חלב 🛒, assignee אמא }
+        ];
+
+        function renderTasks() {
+            const list = document.getElementById('taskList');
+            list.innerHTML = tasks.map(task = `
+                div class=card p-4 flex justify-between items-center
+                    div
+                        h3 class=font-bold text-lg text-gray-800${task.title}h3
+                        p class=text-sm text-blue-500באחריות ${task.assignee}p
+                    div
+                    button onclick=sendNudge(${task.id}, '${task.assignee}') 
+                            class=bg-orange-500 hoverbg-orange-600 text-white px-4 py-2 rounded-full text-sm font-bold transition-transform activescale-95
+                        נדנוד! 🔔
+                    button
+                div
+            `).join('');
+        }
+
+        async function sendNudge(id, name) {
+            alert(`שולח נדנוד ל-${name}...`);
+            try {
+                const response = await fetch('apinudge', {
+                    method 'POST',
+                    headers { 'Content-Type' 'applicationjson' },
+                    body JSON.stringify({ taskId id, target name })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    console.log(Nudge sent successfully!);
+                }
+            } catch (err) {
+                console.error(Error sending nudge, err);
+            }
+        }
+
+        renderTasks();
+    script
+body
+html
