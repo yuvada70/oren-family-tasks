@@ -5,30 +5,109 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>משימות משפחת אורן</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5; }
+        .card { background: white; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    </style>
 </head>
-<body class="bg-gray-100 p-4">
-    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md p-6 mt-10">
-        <h1 class="text-2xl font-bold text-blue-600 mb-6 text-center">Oren Family Tasks 🏠</h1>
-        
-        <div class="space-y-4">
-            <div class="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
-                <div>
-                    <p class="font-bold text-gray-800 text-lg">להוציא את לוסי 🐶</p>
-                    <p class="text-sm text-blue-500 font-medium text-right">באחריות: יולי</p>
-                </div>
-                <button onclick="alert('נדנוד נשלח ליולי! 🔔')" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-full font-bold shadow-sm transition-transform active:scale-95">נדנוד!</button>
+<body class="p-4">
+    <div class="max-w-md mx-auto mt-6">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-extrabold text-blue-600 mb-2">Oren Family Tasks 🏠</h1>
+            <p class="text-gray-500">ניהול משימות ונדנודים בזמן אמת</p>
+        </header>
+
+        <div id="taskList" class="space-y-4">
             </div>
 
-            <div class="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
-                <div>
-                    <p class="font-bold text-gray-800 text-lg">לרוקן מדיח 🍽️</p>
-                    <p class="text-sm text-blue-500 font-medium text-right">באחריות: רומי</p>
-                </div>
-                <button onclick="alert('נדנוד נשלח לרומי! 🔔')" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-full font-bold shadow-sm transition-transform active:scale-95">נדנוד!</button>
-            </div>
-        </div>
-        
-        <p class="text-center text-gray-400 text-xs mt-8 italic text-right">האפליקציה של משפחת אורן - תמיד באוויר</p>
+        <footer class="mt-10 text-center">
+            <button onclick="requestNotificationPermission()" id="permBtn" class="text-xs text-blue-500 underline">
+                לחץ כאן כדי לאפשר התראות בנייד
+            </button>
+            <p class="text-gray-400 text-[10px] mt-4 italic">האפליקציה של משפחת אורן - תמיד באוויר</p>
+        </footer>
     </div>
+
+    <script>
+        // רשימת המשימות - כאן אתה מעדכן בעתיד שמות ומשימות
+        const tasks = [
+            { id: 1, title: "להוציא את לוסי לטיול 🐶", assignee: "יולי" },
+            { id: 2, title: "לרוקן מדיח 🍽️", assignee: "רומי" },
+            { id: 3, title: "לקנות חלב 🛒", assignee: "אמא" }
+        ];
+
+        // פונקציית רינדור המשימות למסך
+        function renderTasks() {
+            const list = document.getElementById('taskList');
+            list.innerHTML = tasks.map(task => `
+                <div class="card p-5 flex justify-between items-center border border-gray-100">
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800">${task.title}</h3>
+                        <p class="text-sm text-blue-500 font-medium">באחריות: ${task.assignee}</p>
+                    </div>
+                    <button onclick="sendNudge(${task.id}, '${task.assignee}')" 
+                            class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-full text-sm font-bold shadow-md transition-all active:scale-90">
+                        נדנוד! 🔔
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // בקשת רשות להתראות
+        async function requestNotificationPermission() {
+            if (!("Notification" in window)) {
+                console.log("דפדפן זה לא תומך בהתראות");
+                return;
+            }
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                document.getElementById('permBtn').style.display = 'none';
+                console.log('התראות אושרו!');
+            }
+        }
+
+        // פונקציית הנדנוד
+        async function sendNudge(id, name) {
+            const task = tasks.find(t => t.id === id);
+            
+            // 1. התראה מקומית אם יש רשות
+            if (Notification.permission === 'granted') {
+                new Notification(`נדנוד משפחתי!`, {
+                    body: `אורן מזכיר ל${name}: ${task.title}`,
+                    icon: 'https://cdn-icons-png.flaticon.com/512/1827/1827347.png'
+                });
+            } else {
+                alert(`שולח נדנוד ל-${name}... (זכור לאשר התראות בהגדרות)`);
+                requestNotificationPermission();
+            }
+
+            // 2. קריאה לשרת ב-Vercel
+            try {
+                await fetch('/api/nudge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ taskId: id, target: name })
+                });
+            } catch (err) {
+                console.error("Error sending nudge", err);
+            }
+        }
+
+        // רישום ה-Service Worker (חשוב להתראות רקע)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                .then(reg => console.log('SW Registered!', reg))
+                .catch(err => console.log('SW Registration failed', err));
+            });
+        }
+
+        // הפעלה ראשונית
+        renderTasks();
+        // מנסה לבקש רשות מיד עם הטעינה
+        if (Notification.permission === 'default') {
+            setTimeout(requestNotificationPermission, 2000);
+        }
+    </script>
 </body>
 </html>
