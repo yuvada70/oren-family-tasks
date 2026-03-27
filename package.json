@@ -1,0 +1,8 @@
+{
+  "name": "oren-family-tasks",
+  "version": "1.0.0",
+  "dependencies": {
+    "web-push": "^3.6.6",
+    "redis": "^4.6.13"
+  }
+}
