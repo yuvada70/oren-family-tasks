@@ -38,7 +38,7 @@
     </div>
 
     <script>
-        const VAPID_PUBLIC_KEY = 'הדבק_כאן_את_ה_PUBLIC_KEY_שלך';
+        const VAPID_PUBLIC_KEY = 'BHZB9arhb7S9hpILNmlHRU8m-_wb1RW7GXg1ZReMo_6HMldYRSaNtYEm6ZZIUi6rlCFjbkZNO_Wl3n6Ui5vzaPo';
 
         let tasks = JSON.parse(localStorage.getItem('familyTasks')) || [
             { id: 1, title: "להוציא את לוסי 🐶", assignee: "יולי" },
@@ -140,7 +140,6 @@
         async function sendNudge(id, name) {
             const task = tasks.find(t => t.id === id);
 
-            // צליל בצד השולח
             try {
                 const ctx = new AudioContext();
                 const osc = ctx.createOscillator();
@@ -150,7 +149,6 @@
                 osc.stop(ctx.currentTime + 0.2);
             } catch(e) {}
 
-            // שליחת push לנמען
             try {
                 const res = await fetch('/api/nudge', {
                     method: 'POST',
