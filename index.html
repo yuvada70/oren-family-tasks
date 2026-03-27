@@ -26,4 +26,214 @@
         <div id="nameScreen" class="hidden card p-6 mb-8 border border-blue-50 text-center">
             <h2 class="text-xl font-bold text-gray-700 mb-4">מי אתה? 👋</h2>
             <div class="grid grid-cols-2 gap-3">
-                <button onclick="setMyName('אבא')"
+                <button onclick="setMyName('אבא')" class="bg-blue-500 text-white font-bold py-4 rounded-2xl text-lg active:scale-95 transition-all">👨 אבא</button>
+                <button onclick="setMyName('אמא')" class="bg-pink-500 text-white font-bold py-4 rounded-2xl text-lg active:scale-95 transition-all">👩 אמא</button>
+                <button onclick="setMyName('רומי')" class="bg-purple-500 text-white font-bold py-4 rounded-2xl text-lg active:scale-95 transition-all">👧 רומי</button>
+                <button onclick="setMyName('יולי')" class="bg-green-500 text-white font-bold py-4 rounded-2xl text-lg active:scale-95 transition-all">👦 יולי</button>
+            </div>
+        </div>
+
+        <!-- מסך ראשי -->
+        <div id="mainScreen" class="hidden">
+            <div id="greetingBar" class="card p-4 mb-6 flex justify-between items-center border border-blue-50">
+                <span id="greetingText" class="font-bold text-gray-700"></span>
+                <button onclick="changeName()" class="text-xs text-gray-400 underline">שנה</button>
+            </div>
+
+            <div class="card p-6 mb-8 border border-blue-50">
+                <div class="space-y-4">
+                    <input type="text" id="taskInput" placeholder="מה המשימה?" class="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-400 outline-none">
+                    <select id="assigneeInput" class="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-400 outline-none text-gray-700 font-bold">
+                        <option value="">למי?</option>
+                        <option value="אבא">👨 אבא</option>
+                        <option value="אמא">👩 אמא</option>
+                        <option value="רומי">👧 רומי</option>
+                        <option value="יולי">👦 יולי</option>
+                    </select>
+                    <button onclick="addNewTask()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl shadow-lg transform active:scale-95 transition-all">
+                        הוסף משימה +
+                    </button>
+                </div>
+            </div>
+
+            <div id="taskList" class="space-y-4"></div>
+        </div>
+
+        <div class="fixed bottom-6 left-0 right-0 px-6 max-w-md mx-auto">
+            <button id="permBtn" onclick="handleNotificationSetup()" class="w-full py-4 rounded-2xl font-bold shadow-2xl transition-all border-2">
+                טוען מצב התראות...
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const VAPID_PUBLIC_KEY = 'BHZB9arhb7S9hpILNmlHRU8m-_wb1RW7GXg1ZReMo_6HMldYRSaNtYEm6ZZIUi6rlCFjbkZNO_Wl3n6Ui5vzaPo';
+
+        let tasks = JSON.parse(localStorage.getItem('familyTasks')) || [
+            { id: 1, title: "להוציא את לוסי 🐶", assignee: "יולי" },
+            { id: 2, title: "לרוקן מדיח 🍽️", assignee: "רומי" }
+        ];
+
+        let myName = localStorage.getItem('myName') || null;
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = atob(base64);
+            return new Uint8Array([...rawData].map(c => c.charCodeAt(0)));
+        }
+
+        function init() {
+            if (!myName) {
+                document.getElementById('nameScreen').classList.remove('hidden');
+                document.getElementById('mainScreen').classList.add('hidden');
+            } else {
+                document.getElementById('nameScreen').classList.add('hidden');
+                document.getElementById('mainScreen').classList.remove('hidden');
+                document.getElementById('greetingText').innerText = `שלום ${myName}! 👋`;
+                updateUI();
+                checkNotificationStatus();
+            }
+        }
+
+        async function setMyName(name) {
+            myName = name;
+            localStorage.setItem('myName', name);
+            document.getElementById('nameScreen').classList.add('hidden');
+            document.getElementById('mainScreen').classList.remove('hidden');
+            document.getElementById('greetingText').innerText = `שלום ${name}! 👋`;
+            updateUI();
+            await handleNotificationSetup();
+        }
+
+        function changeName() {
+            localStorage.removeItem('myName');
+            myName = null;
+            init();
+        }
+
+        function updateUI() {
+            const list = document.getElementById('taskList');
+            list.innerHTML = tasks.map(task => `
+                <div class="card p-5 flex justify-between items-center">
+                    <div class="flex-1">
+                        <h3 class="font-bold text-gray-800 text-lg">${task.title}</h3>
+                        <span class="text-blue-500 text-sm font-bold">👤 ${task.assignee}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="sendNudge(${task.id}, '${task.assignee}')" class="bg-orange-500 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-md active:bg-orange-600 text-xl">🔔</button>
+                        <button onclick="deleteTask(${task.id})" class="text-gray-300 hover:text-red-400">✕</button>
+                    </div>
+                </div>
+            `).join('');
+            localStorage.setItem('familyTasks', JSON.stringify(tasks));
+        }
+
+        async function handleNotificationSetup() {
+            if (!("Notification" in window)) {
+                alert("כדי לקבל התראות באייפון:\n1. פתח ב-Safari\n2. לחץ על 📤\n3. בחר 'הוסף למסך הבית'\n4. פתח מהאייקון החדש");
+                return;
+            }
+
+            const permission = await Notification.requestPermission();
+            if (permission !== "granted") {
+                alert("ההתראות חסומות. כדי לתקן:\n1. לחץ על סמל המנעול ליד כתובת האתר\n2. הפעל את 'Notifications'");
+                return;
+            }
+
+            try {
+                const reg = await navigator.serviceWorker.register('/sw.js');
+                await navigator.serviceWorker.ready;
+
+                const sub = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                });
+
+                const name = myName || localStorage.getItem('myName');
+                if (!name) return;
+
+                await fetch('/api/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subscription: sub, name })
+                });
+            } catch(e) {
+                console.error('Push subscription failed:', e);
+            }
+
+            checkNotificationStatus();
+        }
+
+        function checkNotificationStatus() {
+            const btn = document.getElementById('permBtn');
+            const badge = document.getElementById('statusBadge');
+
+            if (!("Notification" in window)) {
+                btn.innerText = "📲 התקן כ-PWA לקבלת התראות";
+                btn.className = "w-full py-4 rounded-2xl font-bold shadow-2xl transition-all border-2 bg-orange-500 text-white border-orange-600";
+                return;
+            }
+
+            if (Notification.permission === "granted") {
+                btn.innerText = "✅ התראות פעילות";
+                btn.className = "w-full py-4 rounded-2xl font-bold shadow-2xl transition-all border-2 bg-green-50 text-green-600 border-green-200";
+                badge.innerText = "מחובר";
+                badge.className = "mt-2 inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-700";
+            } else {
+                btn.innerText = "🔔 הפעל התראות בנייד";
+                btn.className = "w-full py-4 rounded-2xl font-bold shadow-2xl transition-all border-2 bg-blue-600 text-white border-blue-700 animate-bounce";
+                badge.innerText = "התראות כבויות";
+                badge.className = "mt-2 inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-yellow-100 text-yellow-700";
+            }
+        }
+
+        function addNewTask() {
+            const t = document.getElementById('taskInput');
+            const a = document.getElementById('assigneeInput');
+            if (t.value && a.value) {
+                tasks.unshift({ id: Date.now(), title: t.value, assignee: a.value });
+                t.value = '';
+                a.value = '';
+                updateUI();
+            }
+        }
+
+        function deleteTask(id) {
+            tasks = tasks.filter(t => t.id !== id);
+            updateUI();
+        }
+
+        async function sendNudge(id, name) {
+            const task = tasks.find(t => t.id === id);
+
+            try {
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                osc.connect(ctx.destination);
+                osc.frequency.value = 880;
+                osc.start();
+                osc.stop(ctx.currentTime + 0.2);
+            } catch(e) {}
+
+            try {
+                const res = await fetch('/api/nudge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        target: name,
+                        title: `נדנוד מ${myName}! 🔔`,
+                        body: `${task.title} — קדימה ${name}!`
+                    })
+                });
+                const data = await res.json();
+                alert(data.message);
+            } catch(e) {
+                alert("שגיאה בשליחת הנדנוד 😕");
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
