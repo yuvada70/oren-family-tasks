@@ -93,7 +93,6 @@
             } catch(e) {}
         }
 
-        // מאזין להודעות מה-Service Worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.addEventListener('message', event => {
                 if (event.data?.type === 'PLAY_SOUND') {
@@ -102,15 +101,31 @@
             });
         }
 
-        // מנגן צליל אם האפליקציה נפתחה מלחיצה על notification
-        window.addEventListener('load', () => {
-            if (window.location.search.includes('play=1')) {
-                setTimeout(playAlarm, 500);
-                window.history.replaceState({}, '', '/');
+        function checkNotificationStatus() {
+            const btn = document.getElementById('permBtn');
+            const badge = document.getElementById('statusBadge');
+
+            if (!("Notification" in window)) {
+                btn.innerText = "📲 התקן כ-PWA לקבלת התראות";
+                btn.className = "w-full py-4 rounded-2xl font-bold shadow-2xl transition-all border-2 bg-orange-500 text-white border-orange-600";
+                return;
             }
-        });
+
+            if (Notification.permission === "granted") {
+                btn.innerText = "✅ התראות פעילות";
+                btn.className = "w-full py-4 rounded-2xl font-bold shadow-2xl transition-all border-2 bg-green-50 text-green-600 border-green-200";
+                badge.innerText = "מחובר";
+                badge.className = "mt-2 inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-700";
+            } else {
+                btn.innerText = "🔔 הפעל התראות בנייד";
+                btn.className = "w-full py-4 rounded-2xl font-bold shadow-2xl transition-all border-2 bg-blue-600 text-white border-blue-700 animate-bounce";
+                badge.innerText = "התראות כבויות";
+                badge.className = "mt-2 inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-yellow-100 text-yellow-700";
+            }
+        }
 
         function init() {
+            checkNotificationStatus();
             if (!myName) {
                 document.getElementById('nameScreen').classList.remove('hidden');
                 document.getElementById('mainScreen').classList.add('hidden');
@@ -119,7 +134,11 @@
                 document.getElementById('mainScreen').classList.remove('hidden');
                 document.getElementById('greetingText').innerText = `שלום ${myName}! 👋`;
                 updateUI();
-                checkNotificationStatus();
+            }
+
+            if (window.location.search.includes('play=1')) {
+                setTimeout(playAlarm, 500);
+                window.history.replaceState({}, '', '/');
             }
         }
 
@@ -192,20 +211,42 @@
             checkNotificationStatus();
         }
 
-        function checkNotificationStatus() {
-            const btn = document.getElementById('permBtn');
-            const badge = document.getElementById('statusBadge');
-
-            if (!("Notification" in window)) {
-                btn.innerText = "📲 התקן כ-PWA לקבלת התראות";
-                btn.className = "w-full py-4 rounded-2xl font-bold shadow-2xl transition-all border-2 bg-orange-500 text-white border-orange-600";
-                return;
+        function addNewTask() {
+            const t = document.getElementById('taskInput');
+            const a = document.getElementById('assigneeInput');
+            if (t.value && a.value) {
+                tasks.unshift({ id: Date.now(), title: t.value, assignee: a.value });
+                t.value = '';
+                a.value = '';
+                updateUI();
             }
+        }
 
-            if (Notification.permission === "granted") {
-                btn.innerText = "✅ התראות פעילות";
-                btn.className = "w-full py-4 rounded-2xl font-bold shadow-2xl transition-all border-2 bg-green-50 text-green-600 border-green-200";
-                badge.innerText = "מחובר";
-                badge.className = "mt-2 inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-700";
-            } else {
-                btn.innerText = "
+        function deleteTask(id) {
+            tasks = tasks.filter(t => t.id !== id);
+            updateUI();
+        }
+
+        async function sendNudge(id, name) {
+            const task = tasks.find(t => t.id === id);
+            try {
+                const res = await fetch('/api/nudge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        target: name,
+                        title: `נדנוד מ${myName}! 🔔`,
+                        body: `${task.title} — קדימה ${name}!`
+                    })
+                });
+                const data = await res.json();
+                alert(data.message);
+            } catch(e) {
+                alert("שגיאה בשליחת הנדנוד 😕");
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
