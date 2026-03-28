@@ -66,6 +66,9 @@
         </div>
     </div>
 
+    <!-- אלמנט אודיו נסתר -->
+    <audio id="alarmSound" src="/gravity_falls_theme.mp3" preload="auto"></audio>
+
     <script>
         const VAPID_PUBLIC_KEY = 'BHZB9arhb7S9hpILNmlHRU8m-_wb1RW7GXg1ZReMo_6HMldYRSaNtYEm6ZZIUi6rlCFjbkZNO_Wl3n6Ui5vzaPo';
 
@@ -85,27 +88,9 @@
 
         function playAlarm() {
             try {
-                const ctx = new AudioContext();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-
-                let time = ctx.currentTime;
-                const duration = 0.4;
-                const repeats = 6;
-
-                for (let i = 0; i < repeats; i++) {
-                    osc.frequency.setValueAtTime(1200, time);
-                    gain.gain.setValueAtTime(1, time);
-                    osc.frequency.setValueAtTime(800, time + duration / 2);
-                    gain.gain.setValueAtTime(0.8, time + duration / 2);
-                    time += duration;
-                }
-
-                gain.gain.setValueAtTime(0, time);
-                osc.start(ctx.currentTime);
-                osc.stop(time);
+                const audio = document.getElementById('alarmSound');
+                audio.currentTime = 0;
+                audio.play();
             } catch(e) {}
         }
 
@@ -117,6 +102,14 @@
                 }
             });
         }
+
+        // מנגן צליל אם האפליקציה נפתחה מלחיצה על notification
+        window.addEventListener('load', () => {
+            if (window.location.search.includes('play=1')) {
+                setTimeout(playAlarm, 500);
+                window.history.replaceState({}, '', '/');
+            }
+        });
 
         function init() {
             if (!myName) {
@@ -172,7 +165,7 @@
 
             const permission = await Notification.requestPermission();
             if (permission !== "granted") {
-                alert("ההתראות חסומות. כדי לתקן:\n1. לחץ על סמל המנעול ליד כתובת האתר\n2. הפעל את 'Notifications'");
+                alert("ההתראות חסומות. כדי לתקן:\n1. לחץ על סמל המנעול ליד כתובת האתר\n2. הפעל את Notifications");
                 return;
             }
 
@@ -242,7 +235,6 @@
         async function sendNudge(id, name) {
             const task = tasks.find(t => t.id === id);
 
-            // צליל בצד השולח
             playAlarm();
 
             try {
