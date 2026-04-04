@@ -67,16 +67,11 @@
     </div>
 
     <audio id="alarmSound" src="/gravity_falls_theme.mp3" preload="auto"></audio>
-    <audio id="confirmSound" preload="auto"></audio>
 
     <script>
         const VAPID_PUBLIC_KEY = 'BHZB9arhb7S9hpILNmlHRU8m-_wb1RW7GXg1ZReMo_6HMldYRSaNtYEm6ZZIUi6rlCFjbkZNO_Wl3n6Ui5vzaPo';
 
-        let tasks = JSON.parse(localStorage.getItem('familyTasks')) || [
-            { id: 1, title: "להוציא את לוסי 🐶", assignee: "יולי" },
-            { id: 2, title: "לרוקן מדיח 🍽️", assignee: "רומי" }
-        ];
-
+        let tasks = [];
         let myName = localStorage.getItem('myName') || null;
 
         function urlBase64ToUint8Array(base64String) {
@@ -114,7 +109,6 @@
             navigator.serviceWorker.addEventListener('message', async event => {
                 if (event.data?.type === 'PLAY_SOUND') {
                     playAlarm();
-                    // שולח אישור קבלה לשרת
                     const sender = event.data.sender;
                     if (sender && myName) {
                         await fetch('/api/subscribe', {
@@ -128,6 +122,29 @@
                     playConfirmSound();
                 }
             });
+        }
+
+        async function loadTasks() {
+            try {
+                const res = await fetch('/api/tasks');
+                const data = await res.json();
+                tasks = data.tasks;
+                updateUI();
+            } catch(e) {
+                console.error('שגיאה בטעינת משימות', e);
+            }
+        }
+
+        async function saveTasks() {
+            try {
+                await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tasks })
+                });
+            } catch(e) {
+                console.error('שגיאה בשמירת משימות', e);
+            }
         }
 
         function checkNotificationStatus() {
@@ -162,7 +179,7 @@
                 document.getElementById('nameScreen').classList.add('hidden');
                 document.getElementById('mainScreen').classList.remove('hidden');
                 document.getElementById('greetingText').innerText = `שלום ${myName}! 👋`;
-                updateUI();
+                loadTasks();
             }
 
             const params = new URLSearchParams(window.location.search);
@@ -188,8 +205,8 @@
             document.getElementById('nameScreen').classList.add('hidden');
             document.getElementById('mainScreen').classList.remove('hidden');
             document.getElementById('greetingText').innerText = `שלום ${name}! 👋`;
-            updateUI();
             await handleNotificationSetup();
+            await loadTasks();
         }
 
         function changeName() {
@@ -200,6 +217,10 @@
 
         function updateUI() {
             const list = document.getElementById('taskList');
+            if (tasks.length === 0) {
+                list.innerHTML = '<p class="text-center text-gray-400 py-8">אין משימות כרגע 🎉</p>';
+                return;
+            }
             list.innerHTML = tasks.map(task => `
                 <div class="card p-5 flex justify-between items-center">
                     <div class="flex-1">
@@ -207,12 +228,11 @@
                         <span class="text-blue-500 text-sm font-bold">👤 ${task.assignee}</span>
                     </div>
                     <div class="flex items-center gap-3">
-                        <button onclick="sendNudge(${task.id}, '${task.assignee}')" class="bg-orange-500 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-md active:bg-orange-600 text-xl">🔔</button>
+                        <button onclick="sendNudge(${task.id}, '${task.assignee}', '${task.title}')" class="bg-orange-500 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-md active:bg-orange-600 text-xl">🔔</button>
                         <button onclick="deleteTask(${task.id})" class="text-gray-300 hover:text-red-400">✕</button>
                     </div>
                 </div>
             `).join('');
-            localStorage.setItem('familyTasks', JSON.stringify(tasks));
         }
 
         async function handleNotificationSetup() {
@@ -251,7 +271,7 @@
             checkNotificationStatus();
         }
 
-        function addNewTask() {
+        async function addNewTask() {
             const t = document.getElementById('taskInput');
             const a = document.getElementById('assigneeInput');
             if (t.value && a.value) {
@@ -259,16 +279,17 @@
                 t.value = '';
                 a.value = '';
                 updateUI();
+                await saveTasks();
             }
         }
 
-        function deleteTask(id) {
+        async function deleteTask(id) {
             tasks = tasks.filter(t => t.id !== id);
             updateUI();
+            await saveTasks();
         }
 
-        async function sendNudge(id, name) {
-            const task = tasks.find(t => t.id === id);
+        async function sendNudge(id, name, title) {
             try {
                 const res = await fetch('/api/nudge', {
                     method: 'POST',
@@ -277,7 +298,7 @@
                         target: name,
                         sender: myName,
                         title: `נדנוד מ${myName}! 🔔`,
-                        body: `${task.title} — קדימה ${name}!`
+                        body: `${title} — קדימה ${name}!`
                     })
                 });
                 const data = await res.json();
