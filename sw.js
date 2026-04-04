@@ -9,38 +9,29 @@ self.addEventListener('push', event => {
         tag: data.type === 'confirmation' ? 'confirmation' : 'nudge',
         renotify: true,
         requireInteraction: data.type !== 'confirmation',
-        data: { 
+        data: {
           url: self.location.origin,
           sender: data.sender,
+          taskTitle: data.taskTitle,
           type: data.type
         }
       });
 
-      // אם זה נדנוד — שולח אישור קבלה אוטומטית
-      if (data.type === 'nudge' && data.sender) {
-        const myName = await self.clients.matchAll({ type: 'window' })
-          .then(clients => clients.length > 0 
-            ? clients[0].evaluate?.('localStorage.getItem("myName")') 
-            : null
-          ).catch(() => null);
+      const clients = await self.clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true
+      });
 
-        // מודיע לאפליקציה לשלוח אישור
-        const clients = await self.clients.matchAll({ 
-          type: 'window', 
-          includeUncontrolled: true 
-        });
-        clients.forEach(client => client.postMessage({ 
-          type: 'PLAY_SOUND'
+      if (data.type === 'nudge') {
+        clients.forEach(client => client.postMessage({
+          type: 'PLAY_SOUND',
+          sender: data.sender,
+          taskTitle: data.taskTitle
         }));
       }
 
-      // אם זה אישור קבלה — רק מנגן צליל קצר
       if (data.type === 'confirmation') {
-        const clients = await self.clients.matchAll({ 
-          type: 'window', 
-          includeUncontrolled: true 
-        });
-        clients.forEach(client => client.postMessage({ 
+        clients.forEach(client => client.postMessage({
           type: 'CONFIRMATION_SOUND'
         }));
       }
@@ -50,19 +41,22 @@ self.addEventListener('push', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const { url, sender, type } = event.notification.data;
+  const { url, sender, taskTitle, type } = event.notification.data;
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window' }).then(async clients => {
       if (clients.length > 0) {
         await clients[0].focus();
-        clients[0].postMessage({ 
+        clients[0].postMessage({
           type: type === 'confirmation' ? 'CONFIRMATION_SOUND' : 'PLAY_SOUND',
-          sender
+          sender,
+          taskTitle
         });
       } else {
-        const newClient = await self.clients.openWindow(
-          type === 'nudge' ? `${url}?play=1&sender=${sender}` : url
+        await self.clients.openWindow(
+          type === 'nudge'
+            ? `${url}?play=1&sender=${encodeURIComponent(sender)}&task=${encodeURIComponent(taskTitle)}`
+            : url
         );
       }
     })
