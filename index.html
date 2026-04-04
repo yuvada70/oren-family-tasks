@@ -67,6 +67,7 @@
     </div>
 
     <audio id="alarmSound" src="/gravity_falls_theme.mp3" preload="auto"></audio>
+    <audio id="confirmSound" preload="auto"></audio>
 
     <script>
         const VAPID_PUBLIC_KEY = 'BHZB9arhb7S9hpILNmlHRU8m-_wb1RW7GXg1ZReMo_6HMldYRSaNtYEm6ZZIUi6rlCFjbkZNO_Wl3n6Ui5vzaPo';
@@ -93,10 +94,38 @@
             } catch(e) {}
         }
 
+        function playConfirmSound() {
+            try {
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.setValueAtTime(600, ctx.currentTime);
+                osc.frequency.setValueAtTime(900, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.5, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.3);
+            } catch(e) {}
+        }
+
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.addEventListener('message', event => {
+            navigator.serviceWorker.addEventListener('message', async event => {
                 if (event.data?.type === 'PLAY_SOUND') {
                     playAlarm();
+                    // שולח אישור קבלה לשרת
+                    const sender = event.data.sender;
+                    if (sender && myName) {
+                        await fetch('/api/subscribe', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ sender, receiver: myName })
+                        });
+                    }
+                }
+                if (event.data?.type === 'CONFIRMATION_SOUND') {
+                    playConfirmSound();
                 }
             });
         }
@@ -136,8 +165,19 @@
                 updateUI();
             }
 
-            if (window.location.search.includes('play=1')) {
-                setTimeout(playAlarm, 500);
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('play') === '1') {
+                const sender = params.get('sender');
+                setTimeout(async () => {
+                    playAlarm();
+                    if (sender && myName) {
+                        await fetch('/api/subscribe', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ sender, receiver: myName })
+                        });
+                    }
+                }, 500);
                 window.history.replaceState({}, '', '/');
             }
         }
@@ -235,6 +275,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         target: name,
+                        sender: myName,
                         title: `נדנוד מ${myName}! 🔔`,
                         body: `${task.title} — קדימה ${name}!`
                     })
