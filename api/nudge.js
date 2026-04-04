@@ -1,8 +1,6 @@
 import webpush from 'web-push';
 import { createClient } from 'redis';
 
-const redis = createClient({ url: process.env.REDIS_URL });
-
 webpush.setVapidDetails(
   `mailto:${process.env.VAPID_EMAIL}`,
   process.env.VAPID_PUBLIC_KEY,
@@ -10,27 +8,42 @@ webpush.setVapidDetails(
 );
 
 export default async function handler(req, res) {
-  if (req.method === 'POST') {
-    const { target, title, body } = req.body;
+  const redis = createClient({ url: process.env.REDIS_URL });
+  await redis.connect();
 
-    await redis.connect();
-    const raw = await redis.get(`sub:${target}`);
-    await redis.disconnect();
+  try {
+    if (req.method === 'POST') {
+      const { target, title, body, sender } = req.body;
 
-    if (!raw) {
-      return res.status(404).json({ 
-        message: `${target} עדיין לא הפעיל התראות 😅` 
-      });
+      const raw = await redis.get(`sub:${target}`);
+      if (!raw) {
+        return res.status(404).json({ 
+          message: `${target} עדיין לא הפעיל התראות 😅` 
+        });
+      }
+
+      const subscription = JSON.parse(raw);
+
+      await webpush.sendNotification(
+        subscription,
+        JSON.stringify({ title, body, sender, type: 'nudge' })
+      );
+
+      // שמירת סטטוס "נשלח" ב-Redis
+      await redis.set(`nudge_status:${sender}:${target}`, 'sent', { EX: 3600 });
+
+      return res.status(200).json({ message: `נדנוד נשלח ל${target}! 🔔` });
     }
 
-    const subscription = JSON.parse(raw);
+    if (req.method === 'GET') {
+      // בדיקת סטטוס אישור קבלה
+      const { sender, target } = req.query;
+      const status = await redis.get(`nudge_status:${sender}:${target}`);
+      return res.status(200).json({ status: status || 'unknown' });
+    }
 
-    await webpush.sendNotification(
-      subscription,
-      JSON.stringify({ title, body })
-    );
-
-    return res.status(200).json({ message: `✅ נדנוד נשלח ל${target}!` });
+    res.status(405).end();
+  } finally {
+    await redis.disconnect();
   }
-  res.status(405).end();
 }
