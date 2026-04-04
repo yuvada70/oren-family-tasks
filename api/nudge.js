@@ -13,12 +13,12 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'POST') {
-      const { target, title, body, sender } = req.body;
+      const { target, title, body, sender, taskTitle } = req.body;
 
       const raw = await redis.get(`sub:${target}`);
       if (!raw) {
-        return res.status(404).json({ 
-          message: `${target} עדיין לא הפעיל התראות 😅` 
+        return res.status(404).json({
+          message: `${target} עדיין לא הפעיל התראות 😅`
         });
       }
 
@@ -26,17 +26,15 @@ export default async function handler(req, res) {
 
       await webpush.sendNotification(
         subscription,
-        JSON.stringify({ title, body, sender, type: 'nudge' })
+        JSON.stringify({ title, body, sender, taskTitle, type: 'nudge' })
       );
 
-      // שמירת סטטוס "נשלח" ב-Redis
       await redis.set(`nudge_status:${sender}:${target}`, 'sent', { EX: 3600 });
 
       return res.status(200).json({ message: `נדנוד נשלח ל${target}! 🔔` });
     }
 
     if (req.method === 'GET') {
-      // בדיקת סטטוס אישור קבלה
       const { sender, target } = req.query;
       const status = await redis.get(`nudge_status:${sender}:${target}`);
       return res.status(200).json({ status: status || 'unknown' });
