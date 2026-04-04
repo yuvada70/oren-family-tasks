@@ -185,6 +185,7 @@
             const params = new URLSearchParams(window.location.search);
             if (params.get('play') === '1') {
                 const sender = params.get('sender');
+                const taskTitle = params.get('task');
                 setTimeout(async () => {
                     playAlarm();
                     if (sender && myName) {
@@ -297,6 +298,7 @@
                     body: JSON.stringify({
                         target: name,
                         sender: myName,
+                        taskTitle: title,
                         title: `נדנוד מ${myName}! 🔔`,
                         body: `${title} — קדימה ${name}!`
                     })
